@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ Chấm công & Tính Lương (Dạng Lịch - Cập nhật Phí CĐ)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #004a99;
+            border-bottom: 2px solid #004a99;
+            padding-bottom: 10px;
+            margin-top: 20px;
+        }
+        .input-section {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .section-column {
+            flex: 1;
+            min-width: 45%;
+        }
+        .input-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .input-group label {
+            flex: 1;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .input-group input[type="number"],
+        .input-group select {
+            flex: 2;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .input-group input[readonly] {
+            background-color: #e9ecef;
+        }
+        
+        /* Timesheet specific styles - Updated for Calendar */
+        .timesheet-container {
+            margin-top: 20px;
+            overflow-x: hidden;
+        }
+        .timesheet-table.calendar-view {
+            width: 100%;
+            min-width: 700px; 
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .timesheet-table.calendar-view th, .timesheet-table.calendar-view td {
+            border: 1px solid #ddd;
+            padding: 0; 
+            text-align: center;
+            height: 100px; /* Chiều cao ô lịch */
+            vertical-align: top;
+        }
+        .timesheet-table.calendar-view th {
+            background-color: #004a99;
+            color: #fff;
+            font-size: 0.9em;
+            padding: 8px 0;
+        }
+        /* Nội dung bên trong ô lịch */
+        .calendar-cell-content {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .day-number-text {
+            font-weight: bold;
+            font-size: 1.1em;
+            padding: 5px;
+            text-align: left;
+            height: 20px;
+            color: #333;
+        }
+        /* Màu cho Chủ Nhật */
+        .timesheet-table.calendar-view tr td:first-child .day-number-text {
+            color: #dc3545; /* Màu đỏ cho Chủ Nhật */
+        }
+        .empty-day {
+            background-color: #f9f9f9;
+        }
+        /* Style cho ô select Mã ca */
+        .timesheet-table.calendar-view td select {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 35px; /* Tăng chiều cao ô chọn */
+            padding: 5px;
+            border: none;
+            box-sizing: border-box;
+            font-size: 0.9em; /* Tăng cỡ chữ */
+            font-weight: bold;
+            background-color: #e0f7fa;
+            cursor: pointer;
+        }
+        
+        .calculated-hours-display {
+            border: 1px solid #004a99;
+            padding: 10px;
+            background-color: #e6f0ff;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .calculated-hours-display p {
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th, .results-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .results-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .results-table .total-row td {
+            font-weight: bold;
+            background-color: #e0f7fa;
+        }
+        .results-table .grand-total td {
+            font-size: 1.2em;
+            background-color: #a7f3d0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Công cụ Chấm công & Tính Lương 31 Ngày</h1>
+    <p>Nhập mã ca làm việc cho từng ngày trong tháng để tự động tính tổng giờ công và Tiền lương Khác ($\text{TLK}_i$).</p>
+
+    <div class="input-section">
+        
+        <div class="section-column">
+            <h2>1. Thông tin Lương cơ bản</h2>
+            <div class="input-group">
+                <label for="chucdanh">Chọn Chức danh:</label>
+                <select id="chucdanh" onchange="updateSalaryBySelection()">
+                    <option value="TroLy">Trợ lý</option>
+                    <option value="HC">HC</option>
+                    <option value="TruongCa">Trưởng ca</option>
+                    <option value="OLTH">OLTH</option>
+                    <option value="TNTH">TNTH</option>
+                    <option value="VE">VE</option>
+                    <option value="AT">AT</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="bacluong">Chọn Bậc lương:</label>
+                <select id="bacluong" onchange="updateSalaryBySelection()">
+                    <option value="1">Bậc 1</option>
+                    <option value="2" selected>Bậc 2</option>
+                    <option value="3">Bậc 3</option>
+                    <option value="4">Bậc 4</option>
+                    <option value="5">Bậc 5</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="mlcd">Mức Lương Chế độ (MLCĐi - VNĐ):</label>
+                <input type="number" id="mlcd" value="9440000" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="mlnscl">Mức Lương Năng suất Chất lượng (MLNSCLi - 20% MLCĐ):</label>
+                <input type="number" id="mlnscl" value="1888000" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="kc">Hệ số Chất lượng (Kcli):</label>
+                <select id="kc" onchange="calculateSalary()">
+                    <option value="1.0">1.0 (Hoàn thành Tốt)</option>
+                    <option value="1.2">1.2 (Hoàn thành Xuất sắc)</option>
+                    <option value="1.1">1.1 (Hoàn thành Khá)</option>
+                    <option value="0.8">0.8 (Hoàn thành)</option>
+                    <option value="0.6">0.6 (Chưa Hoàn thành)</option>
+                    <option value="0.4">0.4 (Không Hoàn thành)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-column">
+            <h2>2. Thông số Tính công & Thuế</h2>
+             <div class="input-group">
+                <label for="month">Chọn Tháng:</label>
+                <select id="month" onchange="generateCalendar()"></select>
+            </div>
+            <div class="input-group">
+                <label for="year">Chọn Năm:</label>
+                <select id="year" onchange="generateCalendar()"></select>
+            </div>
+
+            <div class="input-group">
+                <label for="nccd">Số Ngày Công Chế độ (NCCĐi - ngày):</label>
+                <input type="number" id="nccd" value="26" min="1" onchange="calculateSalary()">
+            </div>
+             <div class="input-group">
+                <label for="nclv">Ngày Công Làm việc Thực tế (NCLVi - ngày):</label>
+                <input type="number" id="nclv" value="0" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="npt">Số người phụ thuộc (Tính thuế TNCN):</label>
+                <input type="number" id="npt" value="0" min="0" onchange="calculateSalary()">
+            </div>
+
+            <div class="calculated-hours-display">
+                <h3>Kết quả Tổng giờ làm:</h3>
+                <p>Tổng Ngày Công Làm Việc (NCLVi): <span id="display_nclv">0 ngày</span></p>
+                <p>Giờ Làm Thêm Ngày Thường (GLTN - x150%): <span id="display_gltn">0.0 giờ</span></p>
+                <p>Giờ Làm Đêm Thường (GLDTHG - +30%): <span id="display_gldthg">0.0 giờ</span></p>
+                <p>Giờ Làm Thêm Đêm Ngày Thường (GLDTN - x210%): <span id="display_gldtn">0.0 giờ</span></p>
+            </div>
+        </div>
+    </div>
+    
+    <h2>3. Bảng Chấm công Chi tiết (Dạng Lịch)</h2>
+    <div class="timesheet-container">
+        <table class="timesheet-table calendar-view">
+            <thead>
+                <tr>
+                    <th>Chủ Nhật</th>
+                    <th>Thứ Hai</th>
+                    <th>Thứ Ba</th>
+                    <th>Thứ Tư</th>
+                    <th>Thứ Năm</th>
+                    <th>Thứ Sáu</th>
+                    <th>Thứ Bảy</th>
+                </tr>
+            </thead>
+            <tbody id="calendar-body">
+                </tbody>
+        </table>
+    </div>
+    
+    <div class="input-section">
+        <div class="section-column full-width">
+             <h3>Các khoản Tiền lương Khác ($\text{TLK}_i$) khác (Nhập thủ công)</h3>
+            <p><em>(Chỉ dùng cho các khoản **ngoài** giờ làm thêm ngày thường, làm đêm thường và làm thêm đêm ngày thường đã tự tính ở trên)</em></p>
+            <div class="input-group">
+                <label for="gltcw">Làm thêm giờ ngày nghỉ hằng tuần (x200%):</label>
+                <input type="number" id="gltcw" value="0" min="0" onchange="calculateSalary()">
+            </div>
+            <div class="input-group">
+                <label for="gltlt">Làm thêm giờ ngày Lễ, Tết (x300%):</label>
+                <input type="number" id="gltlt" value="0" min="0" onchange="calculateSalary()">
+            </div>
+            <div class="input-group">
+                <label for="gldtlt">Làm thêm đêm ngày nghỉ/Lễ (x270% - x390%):</label>
+                <input type="number" id="gldtlt" value="0" min="0" onchange="calculateSalary()">
+            </div>
+            <div class="input-group">
+                <label for="gnb">Giờ không nghỉ 60 phút (Phụ cấp 100%):</label>
+                <input type="number" id="gnb" value="0" min="0" onchange="calculateSalary()">
+            </div>
+             <input type="hidden" id="gltn" value="0">
+            <input type="hidden" id="gldthg" value="0">
+            <input type="hidden" id="gldtn" value="0">
+        </div>
+    </div>
+
+    <button onclick="calculateSalary()">TÍNH TOÁN LƯƠNG THÁNG</button>
+
+    <h2>4. Kết quả Tính toán Lương</h2>
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>Khoản mục</th>
+                <th>Công thức</th>
+                <th>Số tiền (VNĐ)</th>
+            </tr>
+        </thead>
+        <tbody id="results-body">
+            <tr><td colspan="3" style="text-align: center;">Vui lòng nhập mã ca làm việc và nhấn "TÍNH TOÁN LƯƠNG THÁNG" để xem kết quả.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Bảng dữ liệu lương theo Chức danh và Bậc lương
+    const SALARY_DATA = {
+        "TroLy": { 1: 8800000, 2: 9440000, 3: 10120000, 4: 10880000, 5: 11680000 },
+        "HC": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 },
+        "TruongCa": { 1: 7280000, 2: 7840000, 3: 8440000, 4: 9080000, 5: 9760000 },
+        "OLTH": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 },
+        "TNTH": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 },
+        "VE": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 },
+        "AT": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 }
+    };
+    
+    // Dữ liệu ca làm việc
+    // [Total_Hours, Total_Night_Hours, Night_Overtime_Hours]
+    const SHIFT_HOURS_DATA = {
+        "HC": [8.0, 0, 0],
+        "C01": [8.0, 6, 0], 
+        "C02": [9.5, 1, 0.0], 
+        "C03": [9.0, 0.5, 0.0], 
+        "C04": [8.0, 0, 0],
+        "C05": [12.0, 0, 0], 
+        "C06": [8.0, 0, 0],
+        "C07": [9.0, 0, 0], 
+        "C08": [12.0, 0, 0], 
+        "C09": [12.0, 0, 0], 
+        "C10": [12.0, 0, 0], 
+        "C11": [8.0, 0, 0],
+        "C12": [8.0, 0, 0],
+        "C13": [8.0, 0, 0],
+        "C14": [8.5, 0.5, 0.5], 
+        "C15": [9.5, 1.5, 1.5], 
+        "C16": [15.0, 8, 7.0], 
+        "C17": [16.0, 8, 8.0], 
+        "C18": [12.0, 8, 4.0], 
+        "C19": [12.0, 8, 4.0], 
+        "C20": [12.0, 8, 4.0], 
+        "C21": [4.0, 2, 0.0], 
+        "C22": [8.0, 6, 0.0], 
+        "C23": [12.0, 8, 1.0], 
+        "C24": [8.0, 8, 0.0], 
+        "NGHI": [0.0, 0, 0] 
+    };
+    
+    // HẰNG SỐ TIỀN ĂN CA
+    const TIEN_AN_CA_CO_DINH = 25000;
+    const GIOI_HAN_AN_CA = 650000;
+
+    // Hàm tạo chuỗi Option cho dropdown Mã ca (chỉ hiện mã ca)
+    function getShiftOptions() {
+        // NGHI đổi thành "--" để gọn gàng hơn trong lịch
+        let options = '<option value="NGHI">--</option>'; 
+        for (const code in SHIFT_HOURS_DATA) {
+            if (code !== "NGHI") {
+                options += `<option value="${code}">${code}</option>`;
+            }
+        }
+        return options;
+    }
+
+    // Hàm khởi tạo các control (Tháng, Năm)
+    function setupInitialControls() {
+        const monthSelect = document.getElementById('month');
+        const yearSelect = document.getElementById('year');
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-based
+
+        // Populate months (1 to 12)
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Tháng ${i}`;
+            if (i === currentMonth) option.selected = true; // Set default to current month
+            monthSelect.appendChild(option);
+        }
+
+        // Populate years (current year +/- 2)
+        for (let i = currentYear - 2; i <= currentYear + 2; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Năm ${i}`;
+            if (i === currentYear) option.selected = true; // Set default to current year
+            yearSelect.appendChild(option);
+        }
+        
+        generateCalendar();
+    }
+    
+    // Hàm tạo bảng chấm công dạng lịch (Calendar View)
+    function generateCalendar() {
+        const month = parseInt(document.getElementById('month').value);
+        const year = parseInt(document.getElementById('year').value);
+        const calendarBody = document.getElementById('calendar-body');
+        const shiftOptions = getShiftOptions();
+        
+        // 1. Tính toán ngày trong tháng và ngày bắt đầu
+        const date = new Date(year, month - 1, 1);
+        const firstDayOfWeek = date.getDay(); // 0 = Chủ Nhật, 1 = Thứ Hai...
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        // Clear old calendar
+        calendarBody.innerHTML = '';
+        
+        let row;
+        let dayCounter = 1;
+
+        // 2. Tạo các ô trống cho tuần đầu tiên
+        row = calendarBody.insertRow();
+        for (let i = 0; i < firstDayOfWeek; i++) {
+            const cell = row.insertCell();
+            cell.className = 'empty-day';
+            cell.innerHTML = '<div class="calendar-cell-content"></div>';
+        }
+
+        // 3. Tạo các ngày trong tháng
+        for (let i = 1; i <= daysInMonth; i++) {
+            // Kiểm tra xem đã hết 7 ngày trong tuần chưa (0 = Chủ Nhật)
+            if ((dayCounter - 1 + firstDayOfWeek) % 7 === 0) {
+                row = calendarBody.insertRow();
+            }
+            
+            // Tính toán ngày trong tuần (0:CN, 1:T2, ..., 6:T7)
+            const currentDate = new Date(year, month - 1, i);
+            const dayOfWeek = currentDate.getDay(); // 0 (Sun) to 6 (Sat)
+            
+            // Mặc định: HC cho T2-T6 (1-5), NGHI cho CN/T7 (0/6)
+            let defaultShift = 'NGHI';
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                defaultShift = 'HC';
+            }
+            
+            const cell = row.insertCell();
+            cell.innerHTML = `
+                <div class="calendar-cell-content">
+                    <span class="day-number-text">${i}</span>
+                    <select id="day-${i}" class="daily-shift-select" onchange="calculateDailyHours()">
+                        ${shiftOptions}
+                    </select>
+                </div>
+            `;
+            
+            // Set the default value
+            const selectElement = cell.querySelector(`#day-${i}`);
+            if (selectElement) {
+                selectElement.value = defaultShift;
+            }
+
+            dayCounter++;
+        }
+        
+        // 4. Tạo các ô trống cho tuần cuối cùng (nếu cần)
+        let totalCells = dayCounter - 1 + firstDayOfWeek;
+        let remainingCells = 7 - (totalCells % 7);
+        
+        if (remainingCells < 7) {
+            for (let i = 0; i < remainingCells; i++) {
+                 const cell = row.insertCell();
+                 cell.className = 'empty-day';
+                 cell.innerHTML = '<div class="calendar-cell-content"></div>';
+            }
+        }
+        
+        // Sau khi tạo lịch, chạy tính toán
+        calculateDailyHours();
+    }
+
+
+    // Hàm tính toán tổng giờ làm việc từ bảng chấm công chi tiết
+    function calculateDailyHours() {
+        let total_gltn = 0;
+        let total_gldthg = 0;
+        let total_gldtn = 0;
+        let total_nclv = 0;
+
+        // Vẫn lặp từ 1 đến 31 vì các tháng có ít ngày hơn sẽ không có element ID tương ứng
+        for (let i = 1; i <= 31; i++) {
+            const selectElement = document.getElementById(`day-${i}`);
+
+            if (selectElement) {
+                const shiftCode = selectElement.value;
+            
+                if (shiftCode && shiftCode !== "NGHI") {
+                    const data = getShiftDetails(shiftCode);
+                    
+                    // 1. Tính Ngày công làm việc
+                    total_nclv += 1;
+                    
+                    // 2. Phân tích Giờ làm thêm và Giờ làm đêm
+                    const totalHours = data[0];
+                    const totalNightHours = data[1];
+                    const nightOvertimeHours = data[2];
+
+                    // a. Giờ làm thêm đêm (GLDTN - x210%): Night Overtime
+                    const gl_dt_per_shift = nightOvertimeHours; 
+                    total_gldtn += gl_dt_per_shift;
+
+                    // b. Giờ làm đêm thường (GLDTHG - +30%): Normal Night Hours (within 8h standard)
+                    const normalNightHours = Math.max(0, totalNightHours - gl_dt_per_shift);
+                    total_gldthg += normalNightHours;
+
+                    // c. Giờ làm thêm ngày thường (GLTN - x150%): Total OT - OT Night
+                    const total_ot_per_shift = Math.max(0, totalHours - 8);
+                    const gl_tn_per_shift = Math.max(0, total_ot_per_shift - gl_dt_per_shift);
+                    total_gltn += gl_tn_per_shift;
+                }
+            }
+        }
+
+        // Cập nhật NCLV
+        document.getElementById('nclv').value = total_nclv;
+
+        // Cập nhật giá trị vào các hidden input fields
+        document.getElementById('gltn').value = total_gltn.toFixed(1);
+        document.getElementById('gldthg').value = total_gldthg.toFixed(1);
+        document.getElementById('gldtn').value = total_gldtn.toFixed(1);
+
+        // Cập nhật hiển thị
+        document.getElementById('display_nclv').textContent = `${total_nclv} ngày`;
+        document.getElementById('display_gltn').textContent = `${total_gltn.toFixed(1)} giờ`;
+        document.getElementById('display_gldthg').textContent = `${total_gldthg.toFixed(1)} giờ`;
+        document.getElementById('display_gldtn').textContent = `${total_gldtn.toFixed(1)} giờ`;
+
+        calculateSalary();
+    }
+    
+    // Helper function to get shift details
+    function getShiftDetails(code) {
+        if (code === 'C02') return [9.5, 1, 0.0];
+        if (code === 'C03') return [9.0, 0.5, 0.0];
+        if (code === 'C10') return [12.0, 0, 0.0]; 
+        if (code === 'C23') return [12.0, 8, 1.0]; 
+        return SHIFT_HOURS_DATA[code] || [0, 0, 0];
+    }
+
+    // Hàm cập nhật Mức lương chế độ khi chọn Chức danh/Bậc lương
+    function updateSalaryBySelection() {
+        const chucdanh = document.getElementById('chucdanh').value;
+        const bacluong = parseInt(document.getElementById('bacluong').value);
+        const mlcdInput = document.getElementById('mlcd');
+        const mlnsclInput = document.getElementById('mlnscl');
+
+        if (SALARY_DATA[chucdanh] && SALARY_DATA[chucdanh][bacluong]) {
+            const newMLCD = SALARY_DATA[chucdanh][bacluong];
+            const newMLNSCL = newMLCD * 0.20; // MLNSCL = 20% MLCĐ
+            
+            mlcdInput.value = newMLCD;
+            mlnsclInput.value = newMLNSCL; 
+        } else {
+            mlcdInput.value = 0;
+            mlnsclInput.value = 0;
+        }
+        calculateDailyHours(); // Tính lại giờ TLK dựa trên bảng chấm công
+    }
+
+    // Hàm format số thành tiền tệ Việt Nam
+    function formatCurrency(amount) {
+        if (isNaN(amount)) return '0 VNĐ';
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.round(amount));
+    }
+
+    // Hàm tính Thuế TNCN lũy tiến từng phần
+    function calculatePersonalIncomeTax(taxableIncome) {
+        if (taxableIncome <= 0) return 0;
+
+        let tax = 0;
+        const tiers = [
+            { limit: 5000000, rate: 0.05 },
+            { limit: 10000000, rate: 0.10 },
+            { limit: 18000000, rate: 0.15 },
+            { limit: 32000000, rate: 0.20 },
+            { limit: 52000000, rate: 0.25 },
+            { limit: 80000000, rate: 0.30 },
+            { limit: Infinity, rate: 0.35 }
+        ];
+
+        let remainingIncome = taxableIncome;
+        let previousLimit = 0;
+
+        for (const tier of tiers) {
+            const currentLimit = tier.limit;
+            const taxableAtThisTier = Math.min(remainingIncome, currentLimit - previousLimit);
+
+            if (taxableAtThisTier > 0) {
+                tax += taxableAtThisTier * tier.rate;
+                remainingIncome -= taxableAtThisTier;
+            }
+
+            if (remainingIncome <= 0) break;
+            previousLimit = currentLimit;
+        }
+
+        return tax;
+    }
+
+    function calculateSalary() {
+        // 1. Lấy giá trị đầu vào
+        const MLCD = parseFloat(document.getElementById('mlcd').value) || 0;
+        const MLNSCL = parseFloat(document.getElementById('mlnscl').value) || 0;
+        const Kcl = parseFloat(document.getElementById('kc').value) || 0;
+        const NCCD = parseFloat(document.getElementById('nccd').value) || 1; 
+        const NCLV = parseFloat(document.getElementById('nclv').value) || 0;
+        const NPT = parseInt(document.getElementById('npt').value) || 0;
+
+        // Giờ làm thêm và phụ cấp (TLK components) - Lấy từ input ẩn (đã được tổng hợp)
+        const GLTN = parseFloat(document.getElementById('gltn').value) || 0; 
+        const GLDTHG = parseFloat(document.getElementById('gldthg').value) || 0; 
+        const GLDTN = parseFloat(document.getElementById('gldtn').value) || 0; 
+        // Các khoản còn lại nhập thủ công
+        const GLTCW = parseFloat(document.getElementById('gltcw').value) || 0; 
+        const GLLT = parseFloat(document.getElementById('gltlt').value) || 0; 
+        const GLDTLT = parseFloat(document.getElementById('gldtlt').value) || 0; 
+        const GNB = parseFloat(document.getElementById('gnb').value) || 0; 
+        
+        if (NCCD === 0) {
+            document.getElementById('results-body').innerHTML = '<tr><td colspan="3" style="text-align: center; color: red;">Lỗi: Số Ngày Công Chế độ phải lớn hơn 0!</td></tr>';
+            return;
+        }
+
+        // 2. Tính Tỷ lệ và Lương Giờ cơ sở
+        const totalHoursInMonth = NCCD * 8;
+        const TLGio = (totalHoursInMonth > 0) ? MLCD / totalHoursInMonth : 0;
+
+        // 3. Tính các khoản Lương GỘP
+        
+        // Tiền lương chế độ (TLCDi)
+        const TLCD = (NCCD > 0) ? (MLCD / NCCD) * NCLV : 0;
+        
+        // Tiền lương chất lượng (TLCLi)
+        const TLCL = (NCCD > 0) ? MLNSCL * Kcl * (NCLV / NCCD) : 0;
+        
+        // 4. Tính Tiền Ăn Ca
+        const calculatedAnCa = NCLV * TIEN_AN_CA_CO_DINH;
+        const TL_AN_CA = Math.min(calculatedAnCa, GIOI_HAN_AN_CA);
+        
+        // 5. Tính Tiền Lương Khác (TLKi)
+        
+        // Tiền làm thêm giờ (ban ngày) - (Chỉ tính phần chênh lệch vượt 100%)
+        const TLK_LTN = TLGio * GLTN * 0.50;  // 150% -> 50% chênh lệch
+        const TLK_LTCW = TLGio * GLTCW * 1.00; // 200% -> 100% chênh lệch
+        const TLK_LLT = TLGio * GLLT * 2.00; // 300% -> 200% chênh lệch
+        
+        // Tiền làm đêm thường (Thường) - Phụ cấp 30%
+        const TLK_LDTHG = TLGio * GLDTHG * 0.30;
+        
+        // Tiền làm thêm giờ ca đêm 
+        // Làm thêm đêm ngày thường: 110% chênh lệch (từ 210%)
+        const TLK_LDTN = TLGio * GLDTN * 1.10; 
+        // Làm thêm đêm ngày nghỉ/Lễ: 170% chênh lệch (tối thiểu cho ngày nghỉ - từ 270%)
+        const TLK_LDTLT = TLGio * GLDTLT * 1.70; 
+        
+        // Tiền không nghỉ 60 phút (Phụ cấp 100% của lương giờ)
+        const TLK_GNB = TLGio * GNB * 1.00; 
+
+        // Tổng Tiền lương khác (không bao gồm Tiền ăn ca)
+        const TLK_Total = TLK_LTN + TLK_LTCW + TLK_LLT + TLK_LDTHG + TLK_LDTN + TLK_LDTLT + TLK_GNB;
+        
+        // Tổng Thu nhập Gộp
+        const grossSalary = TLCD + TLCL + TLK_Total + TL_AN_CA;
+
+        // 6. Tính các Khoản Khấu trừ Bắt buộc
+        
+        // Khấu trừ Bảo hiểm (10.5% trên MLCĐ)
+        const bhDeductionRate = 0.105; 
+        const bhDeduction = MLCD * bhDeductionRate;
+
+        // Phí Công đoàn (0.5% trên Tổng Thu nhập Gộp) - ĐÃ CẬP NHẬT
+        const phiCongDoanRate = 0.005; // 0.5%
+        const phiCongDoan = grossSalary * phiCongDoanRate; 
+
+        const totalFixedDeduction = bhDeduction + phiCongDoan;
+
+        // 7. Tính Thuế TNCN
+        const taxBase = 11000000; // Giảm trừ bản thân
+        const dependentDeduction = NPT * 4400000; // Giảm trừ người phụ thuộc
+
+        const taxableIncomeBase = grossSalary - totalFixedDeduction; 
+
+        const netTaxableIncome = taxableIncomeBase - taxBase - dependentDeduction;
+        
+        const pitTax = calculatePersonalIncomeTax(netTaxableIncome > 0 ? netTaxableIncome : 0);
+        
+        // 8. Tính Thu nhập Thực nhận
+        const netSalary = grossSalary - totalFixedDeduction - pitTax;
+
+        // 9. Hiển thị kết quả
+        const resultsBody = document.getElementById('results-body');
+        resultsBody.innerHTML = `
+            <tr>
+                <td>**TIỀN LƯƠNG GỐC CƠ BẢN**</td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Tiền lương Chế độ (TLCDi)</td>
+                <td>(MLCĐi / NCCĐi) * NCLVi</td>
+                <td>${formatCurrency(TLCD)}</td>
+            </tr>
+            <tr>
+                <td>Tiền lương Chất lượng (TLCLi)</td>
+                <td>MLNSCLi * Kcli * (NCLVi / NCCĐi)</td>
+                <td>${formatCurrency(TLCL)}</td>
+            </tr>
+            <tr>
+                <td>**TIỀN PHỤ CẤP & KHÁC**</td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Tiền ăn ca</td>
+                <td>MIN(NCLVi * ${formatCurrency(TIEN_AN_CA_CO_DINH)}, ${formatCurrency(GIOI_HAN_AN_CA)})</td>
+                <td>${formatCurrency(TL_AN_CA)}</td>
+            </tr>
+            <tr>
+                <td>Làm thêm ngày thường (x50%)</td>
+                <td>TLGiờ * ${GLTN.toFixed(1)} giờ * 0.50</td>
+                <td>${formatCurrency(TLK_LTN)}</td>
+            </tr>
+            <tr>
+                <td>Làm thêm ngày nghỉ hằng tuần (x100%)</td>
+                <td>TLGiờ * ${GLTCW.toFixed(1)} giờ * 1.00</td>
+                <td>${formatCurrency(TLK_LTCW)}</td>
+            </tr>
+            <tr>
+                <td>Làm thêm ngày Lễ/Tết (x200%)</td>
+                <td>TLGiờ * ${GLLT.toFixed(1)} giờ * 2.00</td>
+                <td>${formatCurrency(TLK_LLT)}</td>
+            </tr>
+            <tr>
+                <td>Phụ cấp làm đêm thường (x30%)</td>
+                <td>TLGiờ * ${GLDTHG.toFixed(1)} giờ * 0.30</td>
+                <td>${formatCurrency(TLK_LDTHG)}</td>
+            </tr>
+            <tr>
+                <td>Làm thêm đêm ngày thường (x110%)</td>
+                <td>TLGiờ * ${GLDTN.toFixed(1)} giờ * 1.10</td>
+                <td>${formatCurrency(TLK_LDTN)}</td>
+            </tr>
+            <tr>
+                <td>Làm thêm đêm ngày nghỉ/Lễ (x170%+)</td>
+                <td>TLGiờ * ${GLDTLT.toFixed(1)} giờ * 1.70</td>
+                <td>${formatCurrency(TLK_LDTLT)}</td>
+            </tr>
+            <tr>
+                <td>Không nghỉ 60 phút (x100%)</td>
+                <td>TLGiờ * ${GNB.toFixed(1)} giờ * 1.00</td>
+                <td>${formatCurrency(TLK_GNB)}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="2">TỔNG THU NHẬP GỘP (TLCD + TLCL + TLK + Ăn ca)</td>
+                <td>${formatCurrency(grossSalary)}</td>
+            </tr>
+            <tr>
+                <td>**TRỪ CÁC KHOẢN KHẤU TRỪ**</td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Khấu trừ Bảo hiểm (10.5% trên MLCĐi)</td>
+                <td>${formatCurrency(MLCD)} * 10.5%</td>
+                <td>(${formatCurrency(bhDeduction)})</td>
+            </tr>
+            <tr>
+                <td>**Phí Công đoàn (0.5% trên Tổng Thu nhập Gộp)**</td>
+                <td>${formatCurrency(grossSalary)} * 0.5%</td>
+                <td>(${formatCurrency(phiCongDoan)})</td>
+            </tr>
+            <tr>
+                <td>Thuế TNCN phải nộp</td>
+                <td>Thuế suất lũy tiến</td>
+                <td>(${formatCurrency(pitTax)})</td>
+            </tr>
+            <tr class="grand-total">
+                <td colspan="2">THU NHẬP THỰC NHẬN CUỐI CÙNG</td>
+                <td>${formatCurrency(netSalary)}</td>
+            </tr>
+        `;
+    }
+
+    // Khởi tạo các giá trị và tính toán khi tải trang
+    document.addEventListener('DOMContentLoaded', () => {
+        setupInitialControls(); 
+        updateSalaryBySelection();
+    });
+</script>
+
+</body>
+</html>
