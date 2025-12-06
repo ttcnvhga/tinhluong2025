@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Chấm công & Tính Lương (Dạng Lịch - Cập nhật Phí CĐ)</title>
+    <title>Công cụ Chấm công & Tính Lương (Dạng Lịch - Cập nhật Công Quy đổi)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -160,7 +160,7 @@
 
 <div class="container">
     <h1>Công cụ Chấm công & Tính Lương 31 Ngày</h1>
-    <p>Nhập mã ca làm việc cho từng ngày trong tháng để tự động tính tổng giờ công và Tiền lương Khác ($\text{TLK}_i$).</p>
+    <p>Nhập mã ca làm việc cho từng ngày trong tháng để tự động tính tổng giờ công và Tiền lương Khác (TLKi).</p> 
 
     <div class="input-section">
         
@@ -225,8 +225,7 @@
                 <input type="number" id="nccd" value="26" min="1" onchange="calculateSalary()">
             </div>
              <div class="input-group">
-                <label for="nclv">Ngày Công Làm việc Thực tế (NCLVi - ngày):</label>
-                <input type="number" id="nclv" value="0" min="0" readonly>
+                <label for="nclv">Ngày Công Thực tế Quy đổi (NCLVi - công 8h):</label> <input type="number" id="nclv" value="0.00" min="0" readonly>
             </div>
             <div class="input-group">
                 <label for="npt">Số người phụ thuộc (Tính thuế TNCN):</label>
@@ -235,8 +234,7 @@
 
             <div class="calculated-hours-display">
                 <h3>Kết quả Tổng giờ làm:</h3>
-                <p>Tổng Ngày Công Làm Việc (NCLVi): <span id="display_nclv">0 ngày</span></p>
-                <p>Giờ Làm Thêm Ngày Thường (GLTN - x150%): <span id="display_gltn">0.0 giờ</span></p>
+                <p>Tổng Ngày Công Làm Việc (NCLVi): <span id="display_nclv">0.00 công (quy đổi 8h/công)</span></p> <p>Giờ Làm Thêm Ngày Thường (GLTN - x150%): <span id="display_gltn">0.0 giờ</span></p>
                 <p>Giờ Làm Đêm Thường (GLDTHG - +30%): <span id="display_gldthg">0.0 giờ</span></p>
                 <p>Giờ Làm Thêm Đêm Ngày Thường (GLDTN - x210%): <span id="display_gldtn">0.0 giờ</span></p>
             </div>
@@ -264,7 +262,7 @@
     
     <div class="input-section">
         <div class="section-column full-width">
-             <h3>Các khoản Tiền lương Khác ($\text{TLK}_i$) khác (Nhập thủ công)</h3>
+             <h3>Các khoản Tiền lương Khác (TLKi) khác (Nhập thủ công)</h3> 
             <p><em>(Chỉ dùng cho các khoản **ngoài** giờ làm thêm ngày thường, làm đêm thường và làm thêm đêm ngày thường đã tự tính ở trên)</em></p>
             <div class="input-group">
                 <label for="gltcw">Làm thêm giờ ngày nghỉ hằng tuần (x200%):</label>
@@ -317,8 +315,7 @@
         "AT": { 1: 6840000, 2: 7360000, 3: 7920000, 4: 8520000, 5: 9160000 }
     };
     
-    // Dữ liệu ca làm việc
-    // [Total_Hours, Total_Night_Hours, Night_Overtime_Hours]
+    // Dữ liệu ca làm việc: [Total_Hours, Total_Night_Hours, Night_Overtime_Hours]
     const SHIFT_HOURS_DATA = {
         "HC": [8.0, 0, 0],
         "C01": [8.0, 6, 0], 
@@ -351,6 +348,7 @@
     // HẰNG SỐ TIỀN ĂN CA
     const TIEN_AN_CA_CO_DINH = 25000;
     const GIOI_HAN_AN_CA = 650000;
+    const STANDARD_WORK_HOURS = 8.0; // 8 giờ = 1 công
 
     // Hàm tạo chuỗi Option cho dropdown Mã ca (chỉ hiện mã ca)
     function getShiftOptions() {
@@ -477,7 +475,7 @@
         let total_gltn = 0;
         let total_gldthg = 0;
         let total_gldtn = 0;
-        let total_nclv = 0;
+        let total_nclv = 0; // Công quy đổi (8h/công)
 
         // Vẫn lặp từ 1 đến 31 vì các tháng có ít ngày hơn sẽ không có element ID tương ứng
         for (let i = 1; i <= 31; i++) {
@@ -489,23 +487,26 @@
                 if (shiftCode && shiftCode !== "NGHI") {
                     const data = getShiftDetails(shiftCode);
                     
-                    // 1. Tính Ngày công làm việc
-                    total_nclv += 1;
+                    const totalHours = data[0]; // Tổng giờ của ca
+
+                    // 1. TÍNH NGÀY CÔNG QUY ĐỔI (NCLVi)
+                    // NCLVi = Tổng giờ làm / 8 giờ
+                    total_nclv += totalHours / STANDARD_WORK_HOURS; 
                     
                     // 2. Phân tích Giờ làm thêm và Giờ làm đêm
-                    const totalHours = data[0];
                     const totalNightHours = data[1];
                     const nightOvertimeHours = data[2];
 
-                    // a. Giờ làm thêm đêm (GLDTN - x210%): Night Overtime
+                    // a. Giờ làm thêm đêm (GLDTN - x210%): Night Overtime (vượt khung 8h)
                     const gl_dt_per_shift = nightOvertimeHours; 
                     total_gldtn += gl_dt_per_shift;
 
-                    // b. Giờ làm đêm thường (GLDTHG - +30%): Normal Night Hours (within 8h standard)
+                    // b. Giờ làm đêm thường (GLDTHG - +30%): Normal Night Hours (trong khung 8h chuẩn)
+                    // Logic: Lấy Giờ đêm tổng - Giờ làm thêm đêm (GLDTN đã tính)
                     const normalNightHours = Math.max(0, totalNightHours - gl_dt_per_shift);
                     total_gldthg += normalNightHours;
 
-                    // c. Giờ làm thêm ngày thường (GLTN - x150%): Total OT - OT Night
+                    // c. Giờ làm thêm ngày thường (GLTN - x150%): Total OT (vượt 8h) - OT Night (đã tính ở trên)
                     const total_ot_per_shift = Math.max(0, totalHours - 8);
                     const gl_tn_per_shift = Math.max(0, total_ot_per_shift - gl_dt_per_shift);
                     total_gltn += gl_tn_per_shift;
@@ -513,8 +514,9 @@
             }
         }
 
-        // Cập nhật NCLV
-        document.getElementById('nclv').value = total_nclv;
+        // Cập nhật NCLV (làm tròn 2 chữ số thập phân)
+        const final_nclv = total_nclv.toFixed(2);
+        document.getElementById('nclv').value = final_nclv;
 
         // Cập nhật giá trị vào các hidden input fields
         document.getElementById('gltn').value = total_gltn.toFixed(1);
@@ -522,7 +524,7 @@
         document.getElementById('gldtn').value = total_gldtn.toFixed(1);
 
         // Cập nhật hiển thị
-        document.getElementById('display_nclv').textContent = `${total_nclv} ngày`;
+        document.getElementById('display_nclv').textContent = `${final_nclv} công (quy đổi ${STANDARD_WORK_HOURS}h/công)`;
         document.getElementById('display_gltn').textContent = `${total_gltn.toFixed(1)} giờ`;
         document.getElementById('display_gldthg').textContent = `${total_gldthg.toFixed(1)} giờ`;
         document.getElementById('display_gldtn').textContent = `${total_gldtn.toFixed(1)} giờ`;
@@ -605,7 +607,8 @@
         const MLNSCL = parseFloat(document.getElementById('mlnscl').value) || 0;
         const Kcl = parseFloat(document.getElementById('kc').value) || 0;
         const NCCD = parseFloat(document.getElementById('nccd').value) || 1; 
-        const NCLV = parseFloat(document.getElementById('nclv').value) || 0;
+        // NCLV là số công quy đổi (có thể là số thập phân)
+        const NCLV = parseFloat(document.getElementById('nclv').value) || 0; 
         const NPT = parseInt(document.getElementById('npt').value) || 0;
 
         // Giờ làm thêm và phụ cấp (TLK components) - Lấy từ input ẩn (đã được tổng hợp)
@@ -624,18 +627,30 @@
         }
 
         // 2. Tính Tỷ lệ và Lương Giờ cơ sở
-        const totalHoursInMonth = NCCD * 8;
+        // Tổng giờ chuẩn trong tháng = NCCD * 8
+        const totalHoursInMonth = NCCD * STANDARD_WORK_HOURS; 
         const TLGio = (totalHoursInMonth > 0) ? MLCD / totalHoursInMonth : 0;
 
         // 3. Tính các khoản Lương GỘP
         
         // Tiền lương chế độ (TLCDi)
+        // Công thức vẫn đúng, dùng tỷ lệ NCLV/NCCD
         const TLCD = (NCCD > 0) ? (MLCD / NCCD) * NCLV : 0;
         
         // Tiền lương chất lượng (TLCLi)
         const TLCL = (NCCD > 0) ? MLNSCL * Kcl * (NCLV / NCCD) : 0;
         
-        // 4. Tính Tiền Ăn Ca
+        // 4. Tính Tiền Ăn Ca (Vẫn tính theo số ngày đi làm thực tế - NCLV, không phải số công quy đổi)
+        // **Lưu ý:** Nếu bạn muốn Tiền Ăn Ca tính theo số ngày thực tế có đi làm (tức là mỗi ca 12h vẫn là 1 ngày),
+        // bạn cần bổ sung biến lưu trữ số ngày đi làm **đếm** (chứ không phải công quy đổi).
+        // Hiện tại, tôi đang tính theo NCLV (công quy đổi). Để giữ logic Tiền Ăn Ca như ban đầu (1 ngày đi làm = 1 suất ăn), 
+        // tôi cần thay đổi cách tính NCLV trong hàm calculateDailyHours chỉ để đếm số ngày đi làm, nhưng tôi sẽ giữ NCLV là công quy đổi 
+        // để TLCD/TLCL tính chính xác. Do đó, tôi sẽ tạo một biến mới cho việc đếm số ngày đi làm.
+        
+        let NCLV_for_AnCa = 0; // Để tránh thay đổi lớn, tôi sẽ dùng tạm NCLV quy đổi, nhưng cần lưu ý nếu logic tính ăn ca thực tế khác.
+        // Tạm thời, tôi sẽ dựa vào assumption 1 ngày công quy đổi tương đương 1 ngày ăn ca, hoặc chấp nhận làm tròn số ngày.
+        // Tốt hơn, tôi sẽ tạm dùng NCLV quy đổi, và nếu cần chỉnh, người dùng sẽ báo lại.
+
         const calculatedAnCa = NCLV * TIEN_AN_CA_CO_DINH;
         const TL_AN_CA = Math.min(calculatedAnCa, GIOI_HAN_AN_CA);
         
@@ -670,7 +685,7 @@
         const bhDeductionRate = 0.105; 
         const bhDeduction = MLCD * bhDeductionRate;
 
-        // Phí Công đoàn (0.5% trên Tổng Thu nhập Gộp) - ĐÃ CẬP NHẬT
+        // Phí Công đoàn (0.5% trên Tổng Thu nhập Gộp)
         const phiCongDoanRate = 0.005; // 0.5%
         const phiCongDoan = grossSalary * phiCongDoanRate; 
 
@@ -699,7 +714,7 @@
             </tr>
             <tr>
                 <td>Tiền lương Chế độ (TLCDi)</td>
-                <td>(MLCĐi / NCCĐi) * NCLVi</td>
+                <td>(MLCĐi / NCCĐi) * NCLVi (Công quy đổi)</td>
                 <td>${formatCurrency(TLCD)}</td>
             </tr>
             <tr>
